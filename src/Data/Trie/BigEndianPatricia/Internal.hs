@@ -305,6 +305,8 @@ instance (Monoid a) => Monoid (Trie a) where
     mempty  = empty
     mappend = mergeBy $ \x y -> Just (x `mappend` y)
 
+instance (Monoid a) => Semigroup (Trie a) where
+    (<>) = mappend
 
 -- Since the Monoid instance isn't natural in @a@, I can't think
 -- of any other sensible instance for MonadPlus. It's as specious

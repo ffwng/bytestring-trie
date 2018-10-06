@@ -32,13 +32,13 @@ module Data.Trie.ArrayMapped.Internal
     {-
     , showTrie
     -}
-    
+
     -- * Basic functions
     , empty, null, singleton, size
-    
+
     -- * Conversion and folding functions
     , foldrWithKey, foldrWithKey', assocsBy
-    
+
     -- * Query functions
     , member
     , lookup
@@ -47,14 +47,14 @@ module Data.Trie.ArrayMapped.Internal
     , submap
     , subtrie
     , match_
-    
+
     -- * Single-value modification
     , alter, alterBy, alterBy_
     , adjust, adjust'
-    
+
     -- * Combining tries
     , mergeBy
-    
+
     -- * Mapping functions
     , mapBy
     , filterMap
@@ -62,7 +62,7 @@ module Data.Trie.ArrayMapped.Internal
     , contextualMap'
     , contextualFilterMap
     , contextualMapBy
-    
+
     -- * Priority-queue functions
     , minAssoc
     {-
@@ -108,7 +108,7 @@ import GHC.Exts (build)
 
 
 -- INVARIANT: this particular ByteString is not empty...
-type NonEmptyByteString = ByteString 
+type NonEmptyByteString = ByteString
 
 
 -- | A map from 'ByteString's to @a@. For all the generic functions,
@@ -210,7 +210,7 @@ branch2 s0 s1 vt1 s2 vt2 =
     (Reject    t1, Reject    t2) -> go t1 t2  SA.empty
     where
     k1 = BSU.unsafeHead s1
-    k2 = BSU.unsafeHead s2 
+    k2 = BSU.unsafeHead s2
     go t1 t2 vz = Branch s0 vz (SA.doubleton k1 t1 k2 t2)
 
 
@@ -283,7 +283,7 @@ showTrie :: (Show a) => Trie a -> String
 showTrie t = shows' id t ""
     where
     spaces f = map (const ' ') (f "")
-    
+
     shows' _  Empty            = (".\n"++)
     shows' ss (Branch p m l r) =
         let s'  = ("--"++) . shows p . (","++) . shows m . ("-+"++)
@@ -306,7 +306,7 @@ showTrie t = shows' id t ""
 instance (Binary a) => Binary (Trie a) where
     put (Accept v t) = do put (0 :: Word8); put v; put t
     put (Reject   t) = do put (1 :: Word8);        put t
-    
+
     get = do
         tag <- get :: Get Word8
         case tag of
@@ -318,7 +318,7 @@ instance (Binary a) => Binary (Trunk a) where
     put Empty            = do put (0 :: Word8)
     put (Arc    s v  t)  = do put (1 :: Word8); put s; put v;  put t
     put (Branch s vz tz) = do put (2 :: Word8); put s; put vz; put tz
-    
+
     get = do
         tag <- get :: Get Word8
         case tag of
@@ -330,7 +330,7 @@ instance (Binary a) => Binary (Trunk a) where
 instance (NFData a) => NFData (Trie a) where
     rnf (Accept v t) = rnf v `seq` rnf t
     rnf (Reject   t) = rnf t
-    
+
 instance (NFData a) => NFData (Trunk a) where
     rnf Empty            = ()
     rnf (Arc    _ v  t)  = rnf v  `seq` rnf t
@@ -366,11 +366,11 @@ fmap' f = \t0 ->
     go Empty            = Empty
     go (Arc    s v  t)  = (Arc s $! f v) (go t)
     go (Branch s vz tz) = Branch s (f <$!> vz) (go <$!> tz)
-    
+
     (<$!>) = SA.map'
     -- TODO: should the recursive calls in go@Branch be strict?
     -- N.B., the recursive call for go@Arc is implicitly strict
-    
+
 
 -- TODO: newtype Keys = K Trie  ; instance Foldable Keys
 -- TODO: newtype Assoc = A Trie ; instance Foldable Assoc
@@ -418,7 +418,7 @@ instance Applicative Trie where
 --  3. (m >>= f) >>= g == m >>= (\x -> f x >>= g)
 instance Monad Trie where
     return v = Accept v Empty
-    
+
     Accept v t >>= f  = mkTrie (f v `unionL` go t)
     Reject   t >>= f  = reject (go t)
         where
@@ -436,6 +436,8 @@ instance (Monoid a) => Monoid (Trie a) where
     mempty  = empty
     mappend = mergeBy $ \x y -> Just (x `mappend` y)
 
+instance (Monoid a) => Semigroup (Trie a) where
+    (<>) = mappend
 
 {-
 -- Since the Monoid instance isn't natural in @a@, I can't think
@@ -549,7 +551,7 @@ contextualMap f = \t0 ->
     go Empty            = Empty
     go (Arc    s v  t)  = Arc s (f v t) (go t)
     go (Branch s vz tz) = Branch s (SA.rzipWith_ f2 f1 tz vz) (fmap go tz)
-    
+
     f1   v = f v Empty
     f2 t v = f v t
 
@@ -565,7 +567,7 @@ contextualMap' f = \t0 ->
     go (Arc    s v  t)  = (Arc s $! f v t) (go t)
     go (Branch s vz tz) = Branch s (SA.rzipWith'_ f2 f1 tz vz) (SA.map' go tz)
         -- TODO: should that SA.map be strict or not?
-    
+
     f1   v = f v Empty
     f2 t v = f v t
 
@@ -582,7 +584,7 @@ contextualFilterMap f = \t0 ->
     go (Branch s vz tz) =
         branch s (SA.rzipFilter_ f2 f1 tz vz)
             (SA.filterMap (trunk2maybe . go) tz)
-    
+
     f1   v = f v Empty
     f2 t v = f v t
 
@@ -607,7 +609,7 @@ contextualMapBy f = \t0 ->
         branch s (SA.rzipFilter_ (f2 s') (f1 s') vz tz)
             (SA.filterMap (trunk2maybe . go s') tz)
         -}
-    
+
     f1 s0   v = f s0 v Empty
     f2 s0 t v = f s0 v t
 
@@ -653,7 +655,7 @@ size = \t0 ->
 
 
 {---------------------------------------------------------------
--- Conversion functions 
+-- Conversion functions
 ---------------------------------------------------------------}
 
 -- TODO: when reconstructing keys should we be strict or not??
@@ -666,7 +668,7 @@ foldrWithKey f = flip (start BS.empty)
     where
     start !s0 (Accept v t) z = f s0 v (go s0 t z)
     start  s0 (Reject   t) z =         go s0 t z
-    
+
     go !_ Empty            z = z
     go s0 (Arc    s v  t)  z = f s' v (go s' t z) where !s' = BS.append s0 s
     go s0 (Branch s vz tz) z =
@@ -681,13 +683,13 @@ foldrWithKey' f = flip (start BS.empty)
     where
     start !s0 (Accept v t) !z = f s0 v $! go s0 t z
     start  s0 (Reject   t)  z =           go s0 t z
-    
+
     go !_ Empty            !z = z
     go s0 (Arc    s v  t)   z = f s' v $! go s' t z where !s' = BS.append s0 s
     go s0 (Branch s vz tz)  z =
         SA.foldrWithKey' (start . appendSnoc s0 s) z
             (SA.unionWith_ (\v -> Accept v Empty) Accept Reject vz tz)
-    
+
 
 -- cf Data.ByteString.unpack
 -- <http://hackage.haskell.org/packages/archive/bytestring/0.9.1.4/doc/html/src/Data-ByteString.html>
@@ -813,7 +815,7 @@ lookupBy_ accept reject = start
     start q
         | BS.null q = elimTrie accept reject
         | otherwise = go q . trie2trunk
-    
+
     go !_ Empty       = reject Empty
     go q  (Arc s v t) =
         let (_,q',s') = breakMaximalPrefix q s in
@@ -834,7 +836,7 @@ lookupBy_ accept reject = start
                         (maybe2trunk (SA.lookup w tz))
                 else maybe (reject Empty) (go ws) (SA.lookup w tz)
             else reject Empty
-    
+
 
 
 -- TODO: would it be worth it to have a variant like 'lookupBy_' which takes the two continuations?
@@ -855,7 +857,7 @@ match_ = start
     start q (Reject t)
         | BS.null q = Nothing
         | otherwise = goNothing 0 q t
-    
+
     goNothing !_ !_ Empty       = Nothing
     goNothing n  q  (Arc s v t) =
         let (p,q',s') = breakMaximalPrefix q s in
@@ -873,7 +875,7 @@ match_ = start
         Just (w,ws) ->
             let n' = n + BS.length p + 1 in n' `seq`
             case (BS.null ws, SA.lookup w tz) of
-            (False, Just t) -> 
+            (False, Just t) ->
                 case SA.lookup w vz of
                 Nothing -> goNothing   n' ws t
                 Just v  -> goJust n' v n' ws t
@@ -896,7 +898,7 @@ match_ = start
         Just (w,ws) ->
             let n' = n + BS.length p + 1 in n' `seq`
             case (BS.null ws, SA.lookup w tz) of
-            (False, Just t) -> 
+            (False, Just t) ->
                 case SA.lookup w vz of
                 Nothing -> goJust n0 v0 n' ws t
                 Just v  -> goJust n' v  n' ws t
